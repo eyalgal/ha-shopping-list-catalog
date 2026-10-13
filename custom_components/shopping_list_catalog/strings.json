@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a shopping catalog",
+        "description": "Each catalog is a JSON file with its own sensor, such as one per store. Point a Shopping List Card in Catalog mode at the sensor.",
+        "data": {
+          "name": "Name",
+          "source": "Start from"
+        },
+        "data_description": {
+          "name": "For example Costco. Trader Joe's creates sensor.shopping_catalog_trader_joes.",
+          "source": "New catalogs are saved in the shopping_catalogs folder of your configuration directory."
+        }
+      },
+      "existing": {
+        "title": "Use an existing JSON file",
+        "description": "Enter a path inside your configuration directory. The file keeps its current content and is edited in place.",
+        "data": {
+          "path": "File path"
+        },
+        "data_description": {
+          "path": "Relative to the configuration directory, for example shopping_items.json."
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a name that contains letters or numbers.",
+      "copy_unavailable": "That catalog is no longer available.",
+      "file_exists": "{path} already exists. Choose Existing JSON file to use it.",
+      "invalid_path": "Enter a .json file inside the configuration directory.",
+      "file_not_found": "The file was not found.",
+      "cannot_read": "The file could not be read.",
+      "invalid_catalog": "The file is not a valid catalog: {error}"
+    },
+    "abort": {
+      "already_configured": "This catalog file is already set up."
+    }
+  }
+}
