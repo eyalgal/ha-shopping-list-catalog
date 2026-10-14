@@ -5,6 +5,7 @@ Product catalogs for [Shopping List Card](https://github.com/eyalgal/ha-shopping
 - One sensor per catalog, such as `sensor.shopping_catalog_trader_joes` and `sensor.shopping_catalog_costco`.
 - No `command_line` sensor or `json_attributes` list to keep in sync. New categories appear immediately.
 - Edit categories, products, and variants from the card's editor (Shopping List Card 3.1.0 or later).
+- Learns from the items you check off and suggests what to buy next (Shopping List Card 3.2.0 or later shows them).
 - Saves are atomic, keep the previous version as `<file>.bak`, and never overwrite changes made elsewhere since you opened the editor.
 
 ## Install
@@ -54,7 +55,7 @@ Each catalog can learn what you buy. Open the catalog under **Settings > Devices
 
 From the history, each catalog suggests what you probably need now. An item is suggested when it was bought on at least two different days, not in the last 4 days, and either most of its usual interval has passed or it was bought in at least 2 of the last 3 weeks.
 
-- The catalog sensor's `suggestions` attribute maps each suggested item to `last` (date), `since` (days ago), `every` (usual days between purchases), and `quantity` (usual amount), most overdue first. The Shopping List Card's **Suggested** filter reads it.
+- The catalog sensor's `suggestions` attribute maps each suggested item to `last` (date), `since` (days ago), `every` (usual days between purchases), and `quantity` (usual amount), most overdue first. The Shopping List Card's **Suggested** filter (3.2.0 or later) reads it.
 - A second sensor, for example `sensor.shopping_catalog_supermarket_suggested`, counts the suggestions and lists them in its `items` attribute, which is handy for notifications.
 - Suggestions update whenever a purchase is logged and hourly.
 
