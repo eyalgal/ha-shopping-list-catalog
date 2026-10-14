@@ -20,9 +20,10 @@ def async_register_commands(hass: HomeAssistant) -> None:
     """Register the catalog commands."""
     websocket_api.async_register_command(hass, ws_get)
     websocket_api.async_register_command(hass, ws_save)
+    websocket_api.async_register_command(hass, ws_history)
 
 
-def _find(hass: HomeAssistant, entity_id: str) -> tuple[str, CatalogStore] | None:
+def _find(hass: HomeAssistant, entity_id: str) -> tuple[str, Any] | None:
     entity = er.async_get(hass).async_get(entity_id)
     if entity is None or entity.platform != DOMAIN or entity.config_entry_id is None:
         return None
@@ -40,7 +41,8 @@ async def ws_get(hass: HomeAssistant, connection: websocket_api.ActiveConnection
     if found is None:
         connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
         return
-    title, store = found
+    title, runtime = found
+    store: CatalogStore = runtime.catalog
     await store.async_refresh()
     connection.send_result(
         msg["id"],
@@ -70,7 +72,7 @@ async def ws_save(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
     if found is None:
         connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
         return
-    store = found[1]
+    store: CatalogStore = found[1].catalog
     try:
         revision = await store.async_save(msg["catalog"], msg["revision"])
     except CatalogConflictError as err:
@@ -83,3 +85,15 @@ async def ws_save(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
         )
     else:
         connection.send_result(msg["id"], {"revision": revision})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/history", vol.Required("entity_id"): cv.entity_id})
+@callback
+def ws_history(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Return the purchases logged from a catalog's to-do lists."""
+    found = _find(hass, msg["entity_id"])
+    if found is None:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
+        return
+    history = found[1].history
+    connection.send_result(msg["id"], {"lists": history.lists, "purchases": history.purchases})

@@ -41,6 +41,15 @@ todo_list: todo.shopping_list
 
 The card's visual editor fills in `catalog_attribute` when you pick the sensor. With Shopping List Card 3.1.0 or later, administrators see **Edit products** in the card editor.
 
+## Purchase History
+
+Each catalog can learn what you buy. Open the catalog under **Settings > Devices & Services > Shopping List Catalog**, select **Configure**, and choose the to-do lists it should learn from, usually the list its cards add to.
+
+- An item checked off on one of those lists is logged as a purchase with its name, quantity, and date, whichever app checked it off. Removing an item without checking it off is not a purchase, and unchecking an item within a day undoes it.
+- The history is kept in Home Assistant's storage, separate from the recorder, so it is not purged. Check-offs made while Home Assistant was offline are picked up when it starts.
+- When a list from the built-in **Shopping List** integration is chosen for the first time, its check-offs still in the recorder (usually the last 10 days, or as configured with `purge_keep_days`) are imported once.
+- The catalog sensor's `purchases_logged` attribute shows how many purchases are logged. The history is the groundwork for suggesting what to buy next.
+
 ## Moving From the command_line Sensor
 
 1. Add this integration with **Existing JSON file** and your current path, usually `shopping_items.json`.
@@ -52,7 +61,7 @@ The card's visual editor fills in `catalog_attribute` when you pick the sensor. 
 - The sensor's state is the number of products. The catalog is in its `catalog` attribute, which is excluded from history because large catalogs exceed the recorder's size limit.
 - Edits made to the file by hand are picked up within 30 seconds. A file that is missing or invalid makes the sensor unavailable until it is fixed.
 - Saving from the editor rewrites the file with 2-space indentation. Fields the editor does not know about are kept.
-- Only administrators can save. Removing a catalog from Home Assistant keeps its file.
+- Only administrators can save. Removing a catalog from Home Assistant keeps its file and its purchase history.
 
 ## Format
 

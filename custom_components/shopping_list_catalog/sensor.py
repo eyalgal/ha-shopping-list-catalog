@@ -11,7 +11,7 @@ from homeassistant.util import slugify
 
 from . import CatalogConfigEntry
 from .catalog import CatalogStore, count_products
-from .const import ATTR_CATALOG
+from .const import ATTR_CATALOG, ATTR_PURCHASES
 
 
 def catalog_object_id(title: str) -> str:
@@ -41,14 +41,16 @@ class CatalogSensor(SensorEntity):
     _unrecorded_attributes = frozenset({ATTR_CATALOG})
 
     def __init__(self, entry: CatalogConfigEntry) -> None:
-        self._store: CatalogStore = entry.runtime_data
+        self._store: CatalogStore = entry.runtime_data.catalog
+        self._history = entry.runtime_data.history
         self._attr_unique_id = entry.entry_id
         self._attr_name = f"{entry.title} catalog"
         self.entity_id = f"sensor.{catalog_object_id(entry.title)}"
 
     async def async_added_to_hass(self) -> None:
-        """Follow catalog changes."""
+        """Follow catalog and purchase history changes."""
         self.async_on_remove(self._store.async_add_listener(self.async_write_ha_state))
+        self.async_on_remove(self._history.async_add_listener(self.async_write_ha_state))
 
     @property
     def available(self) -> bool:
@@ -62,5 +64,7 @@ class CatalogSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """The catalog map, read by the card's catalog_attribute."""
-        return {ATTR_CATALOG: self._store.data} if self._store.data is not None else None
+        """The catalog map, read by the card's catalog_attribute, and the purchase count."""
+        if self._store.data is None:
+            return None
+        return {ATTR_CATALOG: self._store.data, ATTR_PURCHASES: len(self._history.purchases)}

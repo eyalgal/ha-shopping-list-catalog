@@ -37,5 +37,19 @@
     "abort": {
       "already_configured": "This catalog file is already set up."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Learn from shopping lists",
+        "description": "Items checked off on these to-do lists are logged as purchases, so the catalog can learn what you buy and how often. The history is kept in Home Assistant's storage and is not purged.",
+        "data": {
+          "todo_lists": "To-do lists"
+        },
+        "data_description": {
+          "todo_lists": "Usually the list this catalog's cards add to. When a Shopping List list is chosen for the first time, its last month of check-offs is imported from the recorder."
+        }
+      }
+    }
   }
 }

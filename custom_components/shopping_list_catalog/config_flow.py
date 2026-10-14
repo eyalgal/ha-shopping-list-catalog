@@ -6,8 +6,11 @@ import copy
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntryState, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -28,6 +31,7 @@ from .const import (
     CATALOG_DIR,
     CONF_PATH,
     CONF_SOURCE,
+    CONF_TODO_LISTS,
     DEFAULT_EXISTING_PATH,
     DOMAIN,
     SOURCE_COPY_PREFIX,
@@ -48,6 +52,12 @@ class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._name = ""
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> CatalogOptionsFlow:
+        """Choose the to-do lists this catalog learns purchases from."""
+        return CatalogOptionsFlow()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Name the catalog and choose where its products come from."""
@@ -83,7 +93,7 @@ class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
             *(
                 SelectOptionDict(value=f"{SOURCE_COPY_PREFIX}{entry.entry_id}", label=f"Copy of {entry.title}")
                 for entry in self._async_current_entries(include_ignore=False)
-                if entry.state is ConfigEntryState.LOADED and entry.runtime_data.data is not None
+                if entry.state is ConfigEntryState.LOADED and entry.runtime_data.catalog.data is not None
             ),
         ]
         schema = vol.Schema(
@@ -139,7 +149,24 @@ class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
                 entry
                 and entry.domain == DOMAIN
                 and entry.state is ConfigEntryState.LOADED
-                and entry.runtime_data.data is not None
+                and entry.runtime_data.catalog.data is not None
             ):
-                return copy.deepcopy(entry.runtime_data.data)
+                return copy.deepcopy(entry.runtime_data.catalog.data)
         return None
+
+
+class CatalogOptionsFlow(OptionsFlow):
+    """Pick the shopping to-do lists whose check-offs are logged as purchases."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Show the list picker."""
+        if user_input is not None:
+            return self.async_create_entry(data={CONF_TODO_LISTS: user_input.get(CONF_TODO_LISTS, [])})
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_TODO_LISTS, default=self.config_entry.options.get(CONF_TODO_LISTS, [])
+                ): EntitySelector(EntitySelectorConfig(domain="todo", multiple=True)),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
