@@ -53,6 +53,8 @@ Each catalog can learn what you buy. Open the catalog under **Settings > Devices
 
 ### Suggestions
 
+<img src="https://raw.githubusercontent.com/eyalgal/ha-shopping-list-card/main/docs/images/catalog-suggested.png" alt="Shopping List Card catalog with the Suggested filter on, showing nine usually bought products, with Apple and Milk already on the list" width="812"/>
+
 From the history, each catalog suggests what you probably need now. An item is suggested when it was bought on at least two different days, not in the last 4 days, and either most of its usual interval has passed or it was bought in at least 2 of the last 3 weeks.
 
 - The catalog sensor's `suggestions` attribute maps each suggested item to `last` (date), `since` (days ago), `every` (usual days between purchases), and `quantity` (usual amount), most overdue first. The Shopping List Card's **Suggested** filter (3.2.0 or later) reads it.
