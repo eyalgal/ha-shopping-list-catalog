@@ -53,7 +53,7 @@ Each catalog can learn what you buy. Open the catalog under **Settings > Devices
 
 ### Suggestions
 
-<img src="https://raw.githubusercontent.com/eyalgal/ha-shopping-list-card/main/docs/images/catalog-suggested.png" alt="Shopping List Card catalog with the Suggested filter on, showing nine usually bought products, with Apple and Milk already on the list and a tooltip on Banana explaining it is usually bought weekly and was last bought 9 days ago" width="812"/>
+<img src="https://raw.githubusercontent.com/eyalgal/ha-shopping-list-card/main/docs/images/catalog-suggested.png" alt="Catalog with the Suggested filter on, showing nine usually bought products across Fruits, Vegetables, and Condiments, with Snap Peas already on the list and a tooltip on Pear: usually bought every 10 days, last bought 9 days ago" width="812"/>
 
 From the history, each catalog suggests what you probably need now. An item is suggested when it was bought on at least two different days, not in the last 4 days, and either most of its usual interval has passed or it was bought in at least 2 of the last 3 weeks.
 
