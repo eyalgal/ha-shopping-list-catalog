@@ -6,6 +6,7 @@ import json
 import logging
 import re
 from collections.abc import Callable, Iterable
+from datetime import timedelta
 from functools import partial
 from typing import Any
 
@@ -14,17 +15,19 @@ from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, Home
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .predict import suggest
 
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
 SAVE_DELAY = 10
+SUGGESTION_REFRESH = timedelta(hours=1)
 # Unchecking an item within this many seconds treats the check-off as a mistake.
 UNDO_WINDOW = 86400
 SHOPPING_LIST_EVENT = "shopping_list_updated"
@@ -97,6 +100,7 @@ class PurchaseHistory:
         self.hass = hass
         self.lists = lists
         self.purchases: list[dict[str, Any]] = []
+        self.suggestions: dict[str, dict[str, Any]] = {}
         self._snapshots: dict[str, Snapshot] = {}
         self._backfilled: list[str] = []
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.history.{entry_id}")
@@ -115,6 +119,7 @@ class PurchaseHistory:
         self.purchases = data.get("purchases", [])
         self._snapshots = data.get("snapshots", {})
         self._backfilled = data.get("backfilled", [])
+        self._recompute()
 
     async def async_backfill(self) -> None:
         """Import check-offs still in the recorder, once per Shopping List list."""
@@ -153,9 +158,10 @@ class PurchaseHistory:
 
     @callback
     def async_start(self) -> CALLBACK_TYPE:
-        """Watch the lists; returns a function that stops watching."""
+        """Watch the lists and keep suggestions current; returns a function that stops."""
+        unsub_refresh = async_track_time_interval(self.hass, self._async_hourly, SUGGESTION_REFRESH)
         if not self.lists:
-            return lambda: None
+            return unsub_refresh
         for entity_id in self.lists:
             self._debouncers[entity_id] = Debouncer(
                 self.hass,
@@ -169,6 +175,7 @@ class PurchaseHistory:
 
         @callback
         def stop() -> None:
+            unsub_refresh()
             unsub_state()
             unsub_started()
             for debouncer in self._debouncers.values():
@@ -245,6 +252,19 @@ class PurchaseHistory:
     def _save(self) -> None:
         self._store.async_delay_save(self._data, SAVE_DELAY)
 
+    def _recompute(self) -> bool:
+        suggestions = suggest(self.purchases, dt_util.now().date())
+        changed = suggestions != self.suggestions
+        self.suggestions = suggestions
+        return changed
+
+    @callback
+    def _async_hourly(self, _now) -> None:
+        if self._recompute():
+            for listener in list(self._listeners):
+                listener()
+
     def _notify(self) -> None:
+        self._recompute()
         for listener in list(self._listeners):
             listener()

@@ -11,7 +11,7 @@ from homeassistant.util import slugify
 
 from . import CatalogConfigEntry
 from .catalog import CatalogStore, count_products
-from .const import ATTR_CATALOG, ATTR_PURCHASES
+from .const import ATTR_CATALOG, ATTR_PURCHASES, ATTR_SUGGESTIONS
 
 
 def catalog_object_id(title: str) -> str:
@@ -27,8 +27,8 @@ async def async_setup_entry(
     entry: CatalogConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the catalog sensor."""
-    async_add_entities([CatalogSensor(entry)])
+    """Add the catalog and suggestions sensors."""
+    async_add_entities([CatalogSensor(entry), SuggestionsSensor(entry)])
 
 
 class CatalogSensor(SensorEntity):
@@ -38,7 +38,7 @@ class CatalogSensor(SensorEntity):
     _attr_icon = "mdi:cart-variant"
     _attr_native_unit_of_measurement = "products"
     # Large catalogs exceed the recorder's attribute size limit.
-    _unrecorded_attributes = frozenset({ATTR_CATALOG})
+    _unrecorded_attributes = frozenset({ATTR_CATALOG, ATTR_SUGGESTIONS})
 
     def __init__(self, entry: CatalogConfigEntry) -> None:
         self._store: CatalogStore = entry.runtime_data.catalog
@@ -64,7 +64,40 @@ class CatalogSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """The catalog map, read by the card's catalog_attribute, and the purchase count."""
+        """The catalog map, read by the card's catalog_attribute, plus purchase count and suggestions."""
         if self._store.data is None:
             return None
-        return {ATTR_CATALOG: self._store.data, ATTR_PURCHASES: len(self._history.purchases)}
+        return {
+            ATTR_CATALOG: self._store.data,
+            ATTR_PURCHASES: len(self._history.purchases),
+            ATTR_SUGGESTIONS: self._history.suggestions,
+        }
+
+
+class SuggestionsSensor(SensorEntity):
+    """How many products are due, with the details in the items attribute."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:cart-heart"
+    _attr_native_unit_of_measurement = "products"
+    _unrecorded_attributes = frozenset({"items"})
+
+    def __init__(self, entry: CatalogConfigEntry) -> None:
+        self._history = entry.runtime_data.history
+        self._attr_unique_id = f"{entry.entry_id}_suggestions"
+        self._attr_name = f"{entry.title} suggestions"
+        self.entity_id = f"sensor.{catalog_object_id(entry.title)}_suggested"
+
+    async def async_added_to_hass(self) -> None:
+        """Follow suggestion changes."""
+        self.async_on_remove(self._history.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_value(self) -> int:
+        """Number of suggested products."""
+        return len(self._history.suggestions)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Suggested products, most overdue first."""
+        return {"items": [{"name": name, **info} for name, info in self._history.suggestions.items()]}

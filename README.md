@@ -48,7 +48,15 @@ Each catalog can learn what you buy. Open the catalog under **Settings > Devices
 - An item checked off on one of those lists is logged as a purchase with its name, quantity, and date, whichever app checked it off. Removing an item without checking it off is not a purchase, and unchecking an item within a day undoes it.
 - The history is kept in Home Assistant's storage, separate from the recorder, so it is not purged. Check-offs made while Home Assistant was offline are picked up when it starts.
 - When a list from the built-in **Shopping List** integration is chosen for the first time, its check-offs still in the recorder (usually the last 10 days, or as configured with `purge_keep_days`) are imported once.
-- The catalog sensor's `purchases_logged` attribute shows how many purchases are logged. The history is the groundwork for suggesting what to buy next.
+- The catalog sensor's `purchases_logged` attribute shows how many purchases are logged.
+
+### Suggestions
+
+From the history, each catalog suggests what you probably need now. An item is suggested when it was bought on at least two different days, not in the last 4 days, and either most of its usual interval has passed or it was bought in at least 2 of the last 3 weeks.
+
+- The catalog sensor's `suggestions` attribute maps each suggested item to `last` (date), `since` (days ago), `every` (usual days between purchases), and `quantity` (usual amount), most overdue first. The Shopping List Card's **Suggested** filter reads it.
+- A second sensor, for example `sensor.shopping_catalog_supermarket_suggested`, counts the suggestions and lists them in its `items` attribute, which is handy for notifications.
+- Suggestions update whenever a purchase is logged and hourly.
 
 ## Moving From the command_line Sensor
 
