@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import re
 import statistics
 from collections import defaultdict
@@ -126,6 +127,37 @@ def _placement(name: str, products: list[dict[str, Any]]) -> dict[str, str] | No
         if product and product["variants"] and head.lower() == product["title"].lower():
             return offer(product, " ".join(words[size:]))
     return None
+
+
+def add_to_catalog(catalog: dict[str, Any], candidate: dict[str, Any], category: str | None) -> dict[str, Any]:
+    """Return the catalog with a candidate added as a new product in category, or as a variant when category is None."""
+    data = copy.deepcopy(catalog)
+    if category is not None:
+        if not isinstance(data.get(category), list):
+            raise ValueError(f'The catalog has no "{category}" category.')
+        data[category].append({"title": candidate["name"]})
+        return data
+    place = candidate.get("variant_of")
+    entries = data.get(place["category"]) if place else None
+    if not isinstance(entries, list):
+        raise ValueError(f"{candidate['name']} can't be added as a variant.")
+    title = place["title"].lower()
+    matches = [
+        index
+        for index, entry in enumerate(entries)
+        if isinstance(entry, dict) and str(entry.get("title", "")).strip().lower() == title
+    ]
+    if not matches:
+        raise ValueError(f"{place['title']} is no longer in the catalog.")
+    if all(entries[index].get("subtitle") and not _variants(entries[index].get("types")) for index in matches):
+        # Variants of this product are separate entries told apart by subtitle.
+        entries.insert(matches[-1] + 1, {"title": entries[matches[0]]["title"], "subtitle": place["variant"]})
+        return data
+    index = next((index for index in matches if not entries[index].get("subtitle")), matches[0])
+    types = entries[index].get("types")
+    existing = list(types) if isinstance(types, list) else _variants(types)
+    entries[index] = {**entries[index], "types": [*existing, place["variant"]]}
+    return data
 
 
 def find_candidates(

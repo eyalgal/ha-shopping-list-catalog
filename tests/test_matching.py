@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.shopping_list_catalog.const import DOMAIN
 from custom_components.shopping_list_catalog.matching import (
+    add_to_catalog,
     canonical_purchases,
     catalog_index,
     find_candidates,
@@ -176,3 +177,96 @@ async def test_catalog_edits_update_suggestions(hass: HomeAssistant, config_dir:
     suggestions = hass.states.get(SENSOR).attributes["suggestions"]
     assert "Kiwi" in suggestions
     assert "Kiwis" not in suggestions
+
+
+def test_candidates_are_added_as_products_or_variants() -> None:
+    def candidate(name, place=None):
+        return {"key": match_key(name), "name": name, "variant_of": place}
+
+    added = add_to_catalog(CATALOG, candidate("Bamba"), "Dairy")
+    assert added["Dairy"][-1] == {"title": "Bamba"}
+    assert CATALOG["Dairy"] == [{"title": "Cheese", "list_prefix": "Dairy"}]
+
+    grapes = add_to_catalog(
+        CATALOG, candidate("Grapes - Red", {"category": "Fruits", "title": "Grapes", "variant": "Red"}), None
+    )
+    assert [entry.get("subtitle") for entry in grapes["Fruits"][:3]] == ["Green", "Purple", "Red"]
+
+    wings = add_to_catalog(
+        CATALOG, candidate("Chicken wings", {"category": "Meat", "title": "chicken", "variant": "Wings"}), None
+    )
+    assert wings["Meat"] == [{"title": "Chicken", "types": ["Breast", {"name": "Thighs"}, "Wings"]}]
+
+    mini = add_to_catalog(
+        CATALOG, candidate("Mini cucumbers", {"category": "Vegetables", "title": "Cucumber", "variant": "Mini"}), None
+    )
+    assert mini["Vegetables"][0] == {"title": "Cucumber", "types": ["Mini"]}
+
+    with pytest.raises(ValueError, match='no "Snacks" category'):
+        add_to_catalog(CATALOG, candidate("Bamba"), "Snacks")
+    with pytest.raises(ValueError, match="can't be added as a variant"):
+        add_to_catalog(CATALOG, candidate("Bamba"), None)
+    with pytest.raises(ValueError, match="no longer in the catalog"):
+        add_to_catalog(
+            CATALOG, candidate("Kiwi gold", {"category": "Fruits", "title": "Kiwi", "variant": "Gold"}), None
+        )
+
+
+async def test_missing_products_on_the_sensor_can_be_added_from_the_card(
+    hass: HomeAssistant,
+    config_dir: Path,
+    hass_ws_client: WebSocketGenerator,
+    hass_read_only_access_token: str,
+) -> None:
+    await _setup_shopping_list(hass)
+    entry = await _setup_catalog(hass, config_dir, [LIST])
+    history = entry.runtime_data.history
+    history.purchases.extend(
+        [
+            bought("Bamba", 9),
+            bought("Bamba", 2),
+            bought("Apple - Fuji", 9),
+            bought("Apple - Fuji 2", 3),
+            bought("Kale", 8),
+            bought("Kale", 1),
+        ]
+    )
+    history._notify()
+    await _settle(hass)
+    missing = hass.states.get(SENSOR).attributes["missing_products"]
+    assert [item["name"] for item in missing] == ["Apple - Fuji", "Bamba", "Kale"]
+    assert missing[0]["variant_of"] == {"category": "Fruits", "title": "Apple", "variant": "Fuji"}
+
+    reader = await hass_ws_client(hass, hass_read_only_access_token)
+    await reader.send_json_auto_id(
+        {"type": f"{DOMAIN}/add_candidate", "entity_id": SENSOR, "key": "bamba", "category": "Fruits"}
+    )
+    assert (await reader.receive_json())["error"]["code"] == "unauthorized"
+
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": f"{DOMAIN}/add_candidate", "entity_id": SENSOR, "key": "bamba", "category": "Fruits"}
+    )
+    assert (await client.receive_json())["success"]
+    await client.send_json_auto_id({"type": f"{DOMAIN}/add_candidate", "entity_id": SENSOR, "key": missing[0]["key"]})
+    assert (await client.receive_json())["success"]
+    await client.send_json_auto_id(
+        {"type": f"{DOMAIN}/add_candidate", "entity_id": SENSOR, "key": "bamba", "category": "Fruits"}
+    )
+    assert (await client.receive_json())["error"]["code"] == "not_found"
+    await client.send_json_auto_id(
+        {"type": f"{DOMAIN}/add_candidate", "entity_id": SENSOR, "key": "kale", "category": "Nope"}
+    )
+    assert 'no "Nope" category' in (await client.receive_json())["error"]["message"]
+    await _settle(hass)
+
+    state = hass.states.get(SENSOR)
+    fruits = state.attributes["catalog"]["Fruits"]
+    assert fruits[0]["types"][-1] == "Fuji"
+    assert fruits[-1] == {"title": "Bamba"}
+    assert [item["name"] for item in state.attributes["missing_products"]] == ["Kale"]
+
+    await client.send_json_auto_id({"type": f"{DOMAIN}/dismiss", "entity_id": SENSOR, "key": "kale"})
+    assert (await client.receive_json())["success"]
+    await _settle(hass)
+    assert hass.states.get(SENSOR).attributes["missing_products"] == []

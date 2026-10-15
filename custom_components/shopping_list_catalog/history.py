@@ -104,6 +104,7 @@ class PurchaseHistory:
         self.catalog = catalog
         self.purchases: list[dict[str, Any]] = []
         self.suggestions: dict[str, dict[str, Any]] = {}
+        self.missing: list[dict[str, Any]] = []
         self.dismissed: list[str] = []
         self._snapshots: dict[str, Snapshot] = {}
         self._backfilled: list[str] = []
@@ -269,6 +270,7 @@ class PurchaseHistory:
         if key not in self.dismissed:
             self.dismissed.append(key)
             self._save()
+            self._notify()
 
     def _catalog_data(self) -> dict[str, Any] | None:
         return self.catalog.data if self.catalog is not None else None
@@ -279,8 +281,10 @@ class PurchaseHistory:
     def _recompute(self) -> bool:
         names, _products = catalog_index(self._catalog_data())
         suggestions = suggest(canonical_purchases(self.purchases, names), dt_util.now().date())
-        changed = suggestions != self.suggestions
+        candidates = self.candidates()
+        changed = suggestions != self.suggestions or candidates != self.missing
         self.suggestions = suggestions
+        self.missing = candidates
         return changed
 
     @callback

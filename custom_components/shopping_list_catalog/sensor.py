@@ -11,7 +11,7 @@ from homeassistant.util import slugify
 
 from . import CatalogConfigEntry
 from .catalog import CatalogStore, count_products
-from .const import ATTR_CATALOG, ATTR_PURCHASES, ATTR_SUGGESTIONS
+from .const import ATTR_CATALOG, ATTR_MISSING, ATTR_PURCHASES, ATTR_SUGGESTIONS
 
 
 def catalog_object_id(title: str) -> str:
@@ -38,7 +38,7 @@ class CatalogSensor(SensorEntity):
     _attr_icon = "mdi:cart-variant"
     _attr_native_unit_of_measurement = "products"
     # Large catalogs exceed the recorder's attribute size limit.
-    _unrecorded_attributes = frozenset({ATTR_CATALOG, ATTR_SUGGESTIONS})
+    _unrecorded_attributes = frozenset({ATTR_CATALOG, ATTR_SUGGESTIONS, ATTR_MISSING})
 
     def __init__(self, entry: CatalogConfigEntry) -> None:
         self._store: CatalogStore = entry.runtime_data.catalog
@@ -71,6 +71,7 @@ class CatalogSensor(SensorEntity):
             ATTR_CATALOG: self._store.data,
             ATTR_PURCHASES: len(self._history.purchases),
             ATTR_SUGGESTIONS: self._history.suggestions,
+            ATTR_MISSING: self._history.missing,
         }
 
 

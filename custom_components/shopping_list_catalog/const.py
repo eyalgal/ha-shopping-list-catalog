@@ -18,6 +18,7 @@ DEFAULT_EXISTING_PATH = "shopping_items.json"
 ATTR_CATALOG = "catalog"
 ATTR_PURCHASES = "purchases_logged"
 ATTR_SUGGESTIONS = "suggestions"
+ATTR_MISSING = "missing_products"
 
 SCAN_INTERVAL = timedelta(seconds=30)
 MAX_CATALOG_BYTES = 1_000_000
