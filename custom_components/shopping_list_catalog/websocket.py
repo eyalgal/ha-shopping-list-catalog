@@ -24,6 +24,7 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_history)
     websocket_api.async_register_command(hass, ws_candidates)
     websocket_api.async_register_command(hass, ws_dismiss)
+    websocket_api.async_register_command(hass, ws_restore)
     websocket_api.async_register_command(hass, ws_add_candidate)
 
 
@@ -128,6 +129,21 @@ def ws_dismiss(hass: HomeAssistant, connection: websocket_api.ActiveConnection, 
         connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
         return
     found[1].history.async_dismiss(msg["key"])
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/restore", vol.Required("entity_id"): cv.entity_id, vol.Required("key"): str}
+)
+@callback
+def ws_restore(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Offer a dismissed product for the catalog again."""
+    found = _find(hass, msg["entity_id"])
+    if found is None:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
+        return
+    found[1].history.async_restore(msg["key"])
     connection.send_result(msg["id"])
 
 

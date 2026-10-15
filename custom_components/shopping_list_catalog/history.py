@@ -272,6 +272,14 @@ class PurchaseHistory:
             self._save()
             self._notify()
 
+    @callback
+    def async_restore(self, key: str) -> None:
+        """Offer a dismissed product for the catalog again."""
+        if key in self.dismissed:
+            self.dismissed.remove(key)
+            self._save()
+            self._notify()
+
     def _catalog_data(self) -> dict[str, Any] | None:
         return self.catalog.data if self.catalog is not None else None
 

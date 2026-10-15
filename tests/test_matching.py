@@ -270,3 +270,11 @@ async def test_missing_products_on_the_sensor_can_be_added_from_the_card(
     assert (await client.receive_json())["success"]
     await _settle(hass)
     assert hass.states.get(SENSOR).attributes["missing_products"] == []
+
+    await reader.send_json_auto_id({"type": f"{DOMAIN}/restore", "entity_id": SENSOR, "key": "kale"})
+    assert (await reader.receive_json())["error"]["code"] == "unauthorized"
+    await client.send_json_auto_id({"type": f"{DOMAIN}/restore", "entity_id": SENSOR, "key": "kale"})
+    assert (await client.receive_json())["success"]
+    await _settle(hass)
+    assert [item["name"] for item in hass.states.get(SENSOR).attributes["missing_products"]] == ["Kale"]
+    assert entry.runtime_data.history.dismissed == []
