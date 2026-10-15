@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
@@ -21,7 +20,11 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .matching import canonical_purchases, catalog_index, find_candidates, split_quantity
 from .predict import suggest
+
+if TYPE_CHECKING:
+    from .catalog import CatalogStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,15 +35,12 @@ SUGGESTION_REFRESH = timedelta(hours=1)
 UNDO_WINDOW = 86400
 SHOPPING_LIST_EVENT = "shopping_list_updated"
 
-_QUANTITY = re.compile(r"^(?P<name>.*?)(?: \((?P<qty>\d+)(?: [^()]+)?\))?$")
-
 type Snapshot = dict[str, list[str]]
 
 
 def parse_summary(summary: str) -> tuple[str, int]:
-    """Split "Milk (2)" or "Milk (2 bottles)" into its name and quantity."""
-    match = _QUANTITY.match(summary.strip())
-    return match["name"].strip(), int(match["qty"]) if match["qty"] else 1
+    """Split "Milk (2)", "Milk (2 bottles)", or "Milk 2" into its name and quantity."""
+    return split_quantity(summary)
 
 
 def purchases_from_shopping_list_events(
@@ -96,11 +96,15 @@ def _load_shopping_list_events(hass: HomeAssistant) -> list[tuple[float, str | N
 class PurchaseHistory:
     """Records check-offs on the watched to-do lists, kept until the files are deleted."""
 
-    def __init__(self, hass: HomeAssistant, entry_id: str, lists: list[str]) -> None:
+    def __init__(
+        self, hass: HomeAssistant, entry_id: str, lists: list[str], catalog: CatalogStore | None = None
+    ) -> None:
         self.hass = hass
         self.lists = lists
+        self.catalog = catalog
         self.purchases: list[dict[str, Any]] = []
         self.suggestions: dict[str, dict[str, Any]] = {}
+        self.dismissed: list[str] = []
         self._snapshots: dict[str, Snapshot] = {}
         self._backfilled: list[str] = []
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.history.{entry_id}")
@@ -119,6 +123,7 @@ class PurchaseHistory:
         self.purchases = data.get("purchases", [])
         self._snapshots = data.get("snapshots", {})
         self._backfilled = data.get("backfilled", [])
+        self.dismissed = data.get("dismissed", [])
         self._recompute()
 
     async def async_backfill(self) -> None:
@@ -159,9 +164,9 @@ class PurchaseHistory:
     @callback
     def async_start(self) -> CALLBACK_TYPE:
         """Watch the lists and keep suggestions current; returns a function that stops."""
-        unsub_refresh = async_track_time_interval(self.hass, self._async_hourly, SUGGESTION_REFRESH)
-        if not self.lists:
-            return unsub_refresh
+        unsubs = [async_track_time_interval(self.hass, self._async_hourly, SUGGESTION_REFRESH)]
+        if self.catalog is not None:
+            unsubs.append(self.catalog.async_add_listener(partial(self._async_hourly, None)))
         for entity_id in self.lists:
             self._debouncers[entity_id] = Debouncer(
                 self.hass,
@@ -170,14 +175,14 @@ class PurchaseHistory:
                 immediate=False,
                 function=partial(self._async_refresh, entity_id),
             )
-        unsub_state = async_track_state_change_event(self.hass, self.lists, self._async_state_changed)
-        unsub_started = async_at_started(self.hass, self._async_refresh_all)
+        if self.lists:
+            unsubs.append(async_track_state_change_event(self.hass, self.lists, self._async_state_changed))
+            unsubs.append(async_at_started(self.hass, self._async_refresh_all))
 
         @callback
         def stop() -> None:
-            unsub_refresh()
-            unsub_state()
-            unsub_started()
+            for unsub in unsubs:
+                unsub()
             for debouncer in self._debouncers.values():
                 debouncer.async_shutdown()
             self._debouncers.clear()
@@ -247,13 +252,33 @@ class PurchaseHistory:
         return False
 
     def _data(self) -> dict[str, Any]:
-        return {"purchases": self.purchases, "snapshots": self._snapshots, "backfilled": self._backfilled}
+        return {
+            "purchases": self.purchases,
+            "snapshots": self._snapshots,
+            "backfilled": self._backfilled,
+            "dismissed": self.dismissed,
+        }
+
+    def candidates(self) -> list[dict[str, Any]]:
+        """Products bought repeatedly that the catalog does not have yet."""
+        return find_candidates(self.purchases, self._catalog_data(), set(self.dismissed))
+
+    @callback
+    def async_dismiss(self, key: str) -> None:
+        """Stop offering a product for the catalog."""
+        if key not in self.dismissed:
+            self.dismissed.append(key)
+            self._save()
+
+    def _catalog_data(self) -> dict[str, Any] | None:
+        return self.catalog.data if self.catalog is not None else None
 
     def _save(self) -> None:
         self._store.async_delay_save(self._data, SAVE_DELAY)
 
     def _recompute(self) -> bool:
-        suggestions = suggest(self.purchases, dt_util.now().date())
+        names, _products = catalog_index(self._catalog_data())
+        suggestions = suggest(canonical_purchases(self.purchases, names), dt_util.now().date())
         changed = suggestions != self.suggestions
         self.suggestions = suggestions
         return changed

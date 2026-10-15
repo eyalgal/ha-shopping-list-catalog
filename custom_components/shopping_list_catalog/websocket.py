@@ -21,6 +21,8 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get)
     websocket_api.async_register_command(hass, ws_save)
     websocket_api.async_register_command(hass, ws_history)
+    websocket_api.async_register_command(hass, ws_candidates)
+    websocket_api.async_register_command(hass, ws_dismiss)
 
 
 def _find(hass: HomeAssistant, entity_id: str) -> tuple[str, Any] | None:
@@ -97,3 +99,31 @@ def ws_history(hass: HomeAssistant, connection: websocket_api.ActiveConnection, 
         return
     history = found[1].history
     connection.send_result(msg["id"], {"lists": history.lists, "purchases": history.purchases})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/candidates", vol.Required("entity_id"): cv.entity_id}
+)
+@callback
+def ws_candidates(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Return products bought repeatedly that the catalog does not have yet."""
+    found = _find(hass, msg["entity_id"])
+    if found is None:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
+        return
+    connection.send_result(msg["id"], {"candidates": found[1].history.candidates()})
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/dismiss", vol.Required("entity_id"): cv.entity_id, vol.Required("key"): str}
+)
+@callback
+def ws_dismiss(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    """Stop offering a product for the catalog."""
+    found = _find(hass, msg["entity_id"])
+    if found is None:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
+        return
+    found[1].history.async_dismiss(msg["key"])
+    connection.send_result(msg["id"])

@@ -59,7 +59,12 @@ From the history, each catalog suggests what you probably need now. An item is s
 
 - The catalog sensor's `suggestions` attribute maps each suggested item to `last` (date), `since` (days ago), `every` (usual days between purchases), and `quantity` (usual amount), most overdue first. The Shopping List Card's **Suggested** filter (3.2.0 or later) reads it.
 - A second sensor, for example `sensor.shopping_catalog_supermarket_suggested`, counts the suggestions and lists them in its `items` attribute, which is handy for notifications.
-- Suggestions update whenever a purchase is logged and hourly.
+- Suggestions update whenever a purchase is logged, when the catalog changes, and hourly.
+- Purchases are matched to catalog products ignoring case and simple plurals, and amounts typed after the name count as quantities, so `Pears`, `Pear (2)`, and `Pear 2` are all the catalog's Pear.
+
+### Products Missing From the Catalog
+
+An item you check off on at least two different days that isn't in the catalog is offered in the Shopping List Card's **Edit products** (3.3.0 or later), under **Bought but not in the catalog**. When the name looks like a variant of an existing product, such as `Mini cucumbers` for Cucumber or `Chicken wings` for Chicken, it can be added as that variant; otherwise you choose the category for a new product. Dismissed items aren't offered again.
 
 ## Moving From the command_line Sensor
 
