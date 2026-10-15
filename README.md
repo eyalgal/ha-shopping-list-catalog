@@ -1,11 +1,14 @@
 # Shopping List Catalog
 
-Product catalogs for [Shopping List Card](https://github.com/eyalgal/ha-shopping-list-card), managed in Home Assistant. Each catalog is a JSON file with its own sensor, so you can keep one per store and edit products from the card instead of by hand.
+Product catalogs for [Shopping List Card](https://github.com/eyalgal/ha-shopping-list-card), managed in Home Assistant. Each catalog is a JSON file with its own sensor, so you can keep one per store and edit products from the card instead of by hand. It also learns what you buy.
 
+<img src="https://raw.githubusercontent.com/eyalgal/ha-shopping-list-card/main/docs/images/catalog-hero.png" alt="Shopping List Card catalog with the Suggested filter on, showing the products usually bought around now with a tooltip explaining one suggestion, and a Not in the catalog yet section offering Hummus, Oat milk, and Sourdough to add to the list or the catalog" width="960"/>
+
+- **Suggests what to buy:** learns from the items you check off, so the card's **Suggested** filter shows what you usually need around now (Shopping List Card 3.2.0 or later).
+- **Finds what's missing:** things you keep buying that aren't products yet appear on the card, ready to add to the list or the catalog (Shopping List Card 3.3.0 or later).
 - One sensor per catalog, such as `sensor.shopping_catalog_trader_joes` and `sensor.shopping_catalog_costco`.
 - No `command_line` sensor or `json_attributes` list to keep in sync. New categories appear immediately.
 - Edit categories, products, and variants from the card's editor (Shopping List Card 3.1.0 or later).
-- Learns from the items you check off and suggests what to buy next (Shopping List Card 3.2.0 or later shows them).
 - Saves are atomic, keep the previous version as `<file>.bak`, and never overwrite changes made elsewhere since you opened the editor.
 
 ## Install
@@ -64,7 +67,9 @@ From the history, each catalog suggests what you probably need now. An item is s
 
 ### Products Missing From the Catalog
 
-An item you check off on at least two different days that isn't in the catalog is offered in the Shopping List Card's **Edit products** (3.3.0 or later), under **Bought but not in the catalog**. When the name looks like a variant of an existing product, such as `Mini cucumbers` for Cucumber or `Chicken wings` for Chicken, it can be added as that variant; otherwise you choose the category for a new product. Dismissed items aren't offered again.
+An item you check off on at least two different days that isn't in the catalog appears in the Shopping List Card's **Not in the catalog yet** section (3.3.0 or later), at the bottom of the catalog by default. Anyone can add it to the shopping list. Administrators can add it to the catalog in the category they choose, or as a variant when the name looks like one of an existing product, such as `Mini cucumbers` for Cucumber or `Chicken wings` for Chicken, and can choose **Don't suggest** for items they never want offered. The same list is in the card editor's **Edit products**.
+
+The catalog sensor's `missing_products` attribute holds these items with how many times and when they were last bought.
 
 ## Moving From the command_line Sensor
 
