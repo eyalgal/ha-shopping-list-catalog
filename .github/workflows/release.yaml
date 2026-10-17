@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    name: Attach integration zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # HACS installs from this asset, which is also what its download count tracks.
+      - name: Build zip
+        run: git archive --format=zip -o shopping_list_catalog.zip HEAD:custom_components/shopping_list_catalog
+
+      - name: Upload zip to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: shopping_list_catalog.zip
