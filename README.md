@@ -15,8 +15,10 @@ Product catalogs for [Shopping List Card](https://github.com/eyalgal/ha-shopping
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=eyalgal&repository=ha-shopping-list-catalog&category=integration)
 
-1. Use the button above, or in HACS open the three-dot menu > **Custom repositories**, add `https://github.com/eyalgal/ha-shopping-list-catalog` as an **Integration**, then download **Shopping List Catalog**.
+1. Use the button above, or open HACS, search for **Shopping List Catalog**, and download it.
 2. Restart Home Assistant.
+
+If the integration doesn't appear in the HACS search, add it as a custom repository: in HACS open the three-dot menu > **Custom repositories**, add `https://github.com/eyalgal/ha-shopping-list-catalog` as an **Integration**, then download **Shopping List Catalog**.
 
 ## Add a Catalog
 

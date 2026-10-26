@@ -39,7 +39,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: CatalogConfigEntry) -> bool:
     """Load one catalog file, expose it as a sensor, and learn from its lists."""
-    store = CatalogStore(hass, resolve_catalog_path(hass.config.config_dir, entry.data[CONF_PATH]))
+    path = await hass.async_add_executor_job(resolve_catalog_path, hass.config.config_dir, entry.data[CONF_PATH])
+    store = CatalogStore(hass, path)
     await store.async_refresh(force=True)
     history = PurchaseHistory(hass, entry.entry_id, list(entry.options.get(CONF_TODO_LISTS, [])), store)
     await history.async_load()

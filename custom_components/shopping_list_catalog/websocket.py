@@ -11,8 +11,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 
-from .catalog import CatalogConflictError, CatalogError, CatalogStore, relative_catalog_path
-from .const import DOMAIN
+from .catalog import CatalogConflictError, CatalogError, CatalogStore
+from .const import CONF_PATH, DOMAIN
 from .matching import add_to_catalog
 
 
@@ -28,14 +28,14 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_add_candidate)
 
 
-def _find(hass: HomeAssistant, entity_id: str) -> tuple[str, Any] | None:
+def _find(hass: HomeAssistant, entity_id: str) -> tuple[str, Any, str] | None:
     entity = er.async_get(hass).async_get(entity_id)
     if entity is None or entity.platform != DOMAIN or entity.config_entry_id is None:
         return None
     entry = hass.config_entries.async_get_entry(entity.config_entry_id)
     if entry is None or entry.state is not ConfigEntryState.LOADED:
         return None
-    return entry.title, entry.runtime_data
+    return entry.title, entry.runtime_data, entry.data[CONF_PATH]
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get", vol.Required("entity_id"): cv.entity_id})
@@ -46,14 +46,14 @@ async def ws_get(hass: HomeAssistant, connection: websocket_api.ActiveConnection
     if found is None:
         connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "Catalog not found.")
         return
-    title, runtime = found
+    title, runtime, path = found
     store: CatalogStore = runtime.catalog
     await store.async_refresh()
     connection.send_result(
         msg["id"],
         {
             "title": title,
-            "path": relative_catalog_path(hass.config.config_dir, store.path),
+            "path": path,
             "catalog": store.data,
             "revision": store.revision,
             "error": store.error,

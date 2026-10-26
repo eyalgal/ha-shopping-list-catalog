@@ -45,6 +45,13 @@ from .sensor import catalog_object_id
 CONF_NAME = "name"
 
 
+def _validate_existing_file(config_dir: str, value: str) -> str:
+    """Check that value is a readable catalog and return its stored path. Runs in the executor."""
+    path = resolve_catalog_path(config_dir, value)
+    read_catalog_file(path)
+    return relative_catalog_path(config_dir, path)
+
+
 class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
     """Create a catalog from a starter, an empty file, an existing file, or another catalog."""
 
@@ -76,9 +83,11 @@ class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[CONF_SOURCE] = "copy_unavailable"
                 else:
                     relative = f"{CATALOG_DIR}/{catalog_object_id(self._name).removeprefix('shopping_catalog_')}.json"
-                    path = resolve_catalog_path(self.hass.config.config_dir, relative)
                     await self.async_set_unique_id(relative)
                     self._abort_if_unique_id_configured()
+                    path = await self.hass.async_add_executor_job(
+                        resolve_catalog_path, self.hass.config.config_dir, relative
+                    )
                     if await self.hass.async_add_executor_job(path.exists):
                         errors["base"] = "file_exists"
                         placeholders["path"] = relative
@@ -114,8 +123,9 @@ class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
         placeholders = {"error": ""}
         if user_input is not None:
             try:
-                path = resolve_catalog_path(self.hass.config.config_dir, user_input[CONF_PATH])
-                await self.hass.async_add_executor_job(read_catalog_file, path)
+                relative = await self.hass.async_add_executor_job(
+                    _validate_existing_file, self.hass.config.config_dir, user_input[CONF_PATH]
+                )
             except CatalogPathError:
                 errors[CONF_PATH] = "invalid_path"
             except FileNotFoundError:
@@ -126,7 +136,6 @@ class CatalogConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_PATH] = "invalid_catalog"
                 placeholders["error"] = str(err)
             else:
-                relative = relative_catalog_path(self.hass.config.config_dir, path)
                 await self.async_set_unique_id(relative)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title=self._name, data={CONF_PATH: relative})
