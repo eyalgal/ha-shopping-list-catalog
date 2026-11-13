@@ -1,5 +1,7 @@
 # Shopping List Catalog
 
+[![Integration Usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.shopping_list_catalog.total)](https://analytics.home-assistant.io/custom_integrations.json)
+
 Product catalogs for [Shopping List Card](https://github.com/eyalgal/ha-shopping-list-card), managed in Home Assistant. Each catalog is a JSON file with its own sensor, so you can keep one per store and edit products from the card instead of by hand. It also learns what you buy.
 
 <img src="https://raw.githubusercontent.com/eyalgal/ha-shopping-list-card/main/docs/images/catalog-hero.png" alt="Shopping List Card catalog with the Suggested filter on, showing the products usually bought around now with a tooltip explaining one suggestion, and a Not in the catalog yet section offering Hummus, Oat milk, and Sourdough to add to the list or the catalog" width="960"/>
